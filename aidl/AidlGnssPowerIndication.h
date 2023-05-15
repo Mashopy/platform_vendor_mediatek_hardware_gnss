@@ -17,25 +17,35 @@
 #pragma once
 
 #include <aidl/android/hardware/gnss/BnGnssPowerIndication.h>
+#include "gps_mtk.h"
+#include <semaphore.h>
 
 namespace aidl::android::hardware::gnss {
 
-struct GnssPowerIndication : public BnGnssPowerIndication {
+struct AidlGnssPowerIndication : public BnGnssPowerIndication {
   public:
+    AidlGnssPowerIndication(const GnssPowerIndicationInterface* halPowerIface);
+    ~AidlGnssPowerIndication();
+
     ndk::ScopedAStatus setCallback(
             const std::shared_ptr<IGnssPowerIndicationCallback>& callback) override;
     ndk::ScopedAStatus requestGnssPowerStats() override;
 
-    void notePowerConsumption();
-
   private:
-    // Guarded by mMutex
-    static std::shared_ptr<IGnssPowerIndicationCallback> sCallback;
+    static void powerCapabilitiesCallback(uint32_t capabilities);
 
-    // Synchronization lock for sCallback
-    mutable std::mutex mMutex;
+    static void powerStatsCallback(GnssPowerStats_ext* gnssPowerStats);
 
-    int numLocationReported;
+    // callback from fwr
+    static std::shared_ptr<IGnssPowerIndicationCallback> sGnssPowerCbIface;
+
+    // hal implemented Gnss Power interface
+    const GnssPowerIndicationInterface* mGnssHalPowerIface;
+
+    // local callback structure for gnss hal
+    static GnssPowerIndicationCallbacks_ext sAidlGnssPowerIndicationCbs;
+
+    static sem_t sSem;
 };
 
 }  // namespace aidl::android::hardware::gnss

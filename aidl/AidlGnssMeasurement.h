@@ -18,35 +18,39 @@
 
 #include <aidl/android/hardware/gnss/BnGnssMeasurementCallback.h>
 #include <aidl/android/hardware/gnss/BnGnssMeasurementInterface.h>
-#include <atomic>
-#include <mutex>
-#include <thread>
+#include <hardware/gps.h>
+#include "gps_mtk.h"
+#include <semaphore.h>
 
 namespace aidl::android::hardware::gnss {
 
-struct GnssMeasurementInterface : public BnGnssMeasurementInterface {
+struct AidlGnssMeasurement : public BnGnssMeasurementInterface {
   public:
-    GnssMeasurementInterface();
-    ~GnssMeasurementInterface();
+    AidlGnssMeasurement(const GpsMeasurementInterface_ext* gpsMeasurementIface);
+    ~AidlGnssMeasurement();
     ndk::ScopedAStatus setCallback(const std::shared_ptr<IGnssMeasurementCallback>& callback,
                                    const bool enableFullTracking,
                                    const bool enableCorrVecOutputs) override;
     ndk::ScopedAStatus close() override;
 
   private:
-    void start(const bool enableCorrVecOutputs);
-    void stop();
-    void reportMeasurement(const GnssData&);
 
-    std::atomic<long> mMinIntervalMillis;
-    std::atomic<bool> mIsActive;
-    std::thread mThread;
+    /*
+     * Callback methods to be passed into the conventional GNSS HAL by the default
+     * implementation. These methods are not part of the IGnssMeasurement base class.
+     */
+    static void gnssMeasurementCb(GnssData_ext* data);
 
-    // Guarded by mMutex
-    static std::shared_ptr<IGnssMeasurementCallback> sCallback;
+    // callback from fwr
+    static std::shared_ptr<IGnssMeasurementCallback> sGnssMeasureCbIface;
 
-    // Synchronization lock for sCallback
-    mutable std::mutex mMutex;
+    // hal implemented Gnss Measurement interface
+    const GpsMeasurementInterface_ext* mGnssHalMeasureIface;
+
+    // local callback structure for gnss hal
+    static GpsMeasurementCallbacks_ext sGnssMeasurementCbs;
+
+    static sem_t sSem;
 };
 
 }  // namespace aidl::android::hardware::gnss

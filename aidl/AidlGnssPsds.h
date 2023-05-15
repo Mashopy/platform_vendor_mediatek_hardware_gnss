@@ -17,21 +17,33 @@
 #pragma once
 
 #include <aidl/android/hardware/gnss/BnGnssPsds.h>
+#include "gps_mtk.h"
+#include <semaphore.h>
 
 namespace aidl::android::hardware::gnss {
 
-struct GnssPsds : public BnGnssPsds {
+struct AidlGnssPsds : public BnGnssPsds {
   public:
+    AidlGnssPsds(const GnssPsdsRequestInterface* halPsdsRequestIface);
+    ~AidlGnssPsds();
+
     ndk::ScopedAStatus setCallback(const std::shared_ptr<IGnssPsdsCallback>& callback) override;
     ndk::ScopedAStatus injectPsdsData(PsdsType psdsType,
                                       const std::vector<uint8_t>& psdsData) override;
 
   private:
-    // Guarded by mMutex
-    static std::shared_ptr<IGnssPsdsCallback> sCallback;
+    static void psdsRequestCb(Psds_type psdsType);
 
-    // Synchronization lock for sCallback
-    mutable std::mutex mMutex;
+    // callback from fwr
+    static std::shared_ptr<IGnssPsdsCallback> sPsdsCbIface;
+
+    // hal implemented Gnss Power interface
+    const GnssPsdsRequestInterface* mGnssHalPsdsIface;
+
+    // local callback structure for gnss hal
+    static GnssPsdsCallbacks_ext sAidlGnssPsdsCbs;
+
+    static sem_t sSem;
 };
 
 }  // namespace aidl::android::hardware::gnss

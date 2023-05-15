@@ -21,13 +21,16 @@
 #include <aidl/android/hardware/gnss/BnGnssMeasurementInterface.h>
 #include <aidl/android/hardware/gnss/BnGnssPowerIndication.h>
 #include <aidl/android/hardware/gnss/BnGnssPsds.h>
-#include "GnssConfiguration.h"
-#include "GnssPowerIndication.h"
+#include <hardware/gps.h>
+#include "gps_mtk.h"
+#include <semaphore.h>
 
 namespace aidl::android::hardware::gnss {
 
-class Gnss : public BnGnss {
+class AidlGnss : public BnGnss {
   public:
+    AidlGnss();
+    ~AidlGnss();
     ndk::ScopedAStatus setCallback(const std::shared_ptr<IGnssCallback>& callback) override;
     ndk::ScopedAStatus close() override;
     ndk::ScopedAStatus getExtensionPsds(std::shared_ptr<IGnssPsds>* iGnssPsds) override;
@@ -38,11 +41,19 @@ class Gnss : public BnGnss {
     ndk::ScopedAStatus getExtensionGnssMeasurement(
             std::shared_ptr<IGnssMeasurementInterface>* iGnssMeasurement) override;
 
-    std::shared_ptr<GnssConfiguration> mGnssConfiguration;
-    std::shared_ptr<GnssPowerIndication> mGnssPowerIndication;
+    static void gnssCapabilitiesCb(uint32_t capabilities);
 
   private:
-    static std::shared_ptr<IGnssCallback> sGnssCallback;
+
+    const GpsInterface_ext* mGnssHalIface;    // gnss hal interface
+    const AidlGnssInterface* mAidlGnssHalIface;  // aidl gnss hal interface
+    static sem_t sSem;
+    static const char* sVersion;
+    static AidlGnssCallbacks_ext sAidlGnssCb; // local static callback for gps hal
+    static std::shared_ptr<IGnssCallback> sGnssCallback; // Aidl client callback from fwr
 };
+
+
+extern int aidl_gnss_main();
 
 }  // namespace aidl::android::hardware::gnss

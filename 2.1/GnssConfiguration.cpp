@@ -22,57 +22,159 @@
 namespace android {
 namespace hardware {
 namespace gnss {
-namespace V2_0 {
+namespace V2_1 {
 namespace implementation {
 
-// Methods from ::android::hardware::gnss::V1_0::IGnssConfiguration follow.
-Return<bool> GnssConfiguration::setSuplEs(bool enable) {
-    ALOGD("setSuplEs enable: %d", enable);
-    // Method deprecated in 2.0 and not expected to be called by the framework.
+GnssConfiguration::GnssConfiguration(const GnssConfigurationInterface_ext* gnssConfigInfc)
+    : mGnssConfigIface(gnssConfigInfc) {}
+
+// Methods from ::android::hardware::gps::V1_1::IGnssConfiguration follow.
+Return<bool> GnssConfiguration::setSuplEs(bool)  {
+    // Deprecated in HIDL 2.0
     return false;
-}
+/*    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
 
-Return<bool> GnssConfiguration::setSuplVersion(uint32_t) {
-    return true;
-}
-
-Return<bool> GnssConfiguration::setSuplMode(hidl_bitfield<SuplMode>) {
-    return true;
-}
-
-Return<bool> GnssConfiguration::setGpsLock(hidl_bitfield<GpsLock> gpsLock) {
-    ALOGD("setGpsLock gpsLock: %hhu", static_cast<GpsLock>(gpsLock));
-    // Method deprecated in 2.0 and not expected to be called by the framework.
+    std::string config = "SUPL_ES=" + std::to_string(enabled ? 1 : 0) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
     return false;
+*/
 }
 
-Return<bool> GnssConfiguration::setLppProfile(hidl_bitfield<LppProfile>) {
+Return<bool> GnssConfiguration::setSuplVersion(uint32_t version)  {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "SUPL_VER=" + std::to_string(version) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
+
     return true;
 }
 
-Return<bool> GnssConfiguration::setGlonassPositioningProtocol(hidl_bitfield<GlonassPosProtocol>) {
+Return<bool> GnssConfiguration::setSuplMode(uint8_t mode)  {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "SUPL_MODE=" + std::to_string(mode) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
     return true;
 }
 
-Return<bool> GnssConfiguration::setEmergencySuplPdn(bool) {
+Return<bool> GnssConfiguration::setLppProfile(uint8_t lppProfile) {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "LPP_PROFILE=" + std::to_string(lppProfile) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
     return true;
 }
+
+Return<bool> GnssConfiguration::setGlonassPositioningProtocol(uint8_t protocol) {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "A_GLONASS_POS_PROTOCOL_SELECT=" +
+            std::to_string(protocol) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
+    return true;
+}
+
+Return<bool> GnssConfiguration::setGpsLock(uint8_t) {
+    // Deprecated in HIDL 2.0
+    return false;
+/*    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "GPS_LOCK=" + std::to_string(lock) + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
+    return false;
+*/
+}
+
+Return<bool> GnssConfiguration::setEmergencySuplPdn(bool enabled) {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    std::string config = "USE_EMERGENCY_PDN_FOR_EMERGENCY_SUPL=" + std::to_string(enabled ? 1 : 0)
+            + "\n";
+    mGnssConfigIface->configuration_update(config.c_str(), config.size());
+    return true;
+}
+
 
 // Methods from ::android::hardware::gnss::V1_1::IGnssConfiguration follow.
-Return<bool> GnssConfiguration::setBlacklist(
-    const hidl_vec<V1_1::IGnssConfiguration::BlacklistedSource>&) {
-    // TODO (b/122463906): Reuse 1.1 implementation.
-    return bool{};
+Return<bool> GnssConfiguration::setBlacklist(const hidl_vec<
+        V1_1::IGnssConfiguration::BlacklistedSource>& sourceList) {
+    std::vector<V2_1::IGnssConfiguration::BlacklistedSource> sourceList21;
+    size_t listSize = sourceList.size();
+    for (size_t i = 0; i < listSize; i++) {
+        V2_1::IGnssConfiguration::BlacklistedSource source21;
+        source21.constellation = static_cast<V2_0::GnssConstellationType>(sourceList[i].constellation);
+        source21.svid = sourceList[i].svid;
+        sourceList21.push_back(source21);
+    }
+
+    return setBlacklist_2_1(sourceList21);
+}
+
+// Methods from ::android::hardware::gnss::V2_1::IGnssConfiguration follow.
+Return<bool> GnssConfiguration::setBlacklist_2_1(const hidl_vec<
+        V2_1::IGnssConfiguration::BlacklistedSource>& sourceList) {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
+    size_t listSize = sourceList.size();
+    long long blackSvid[GNSS_CONSTELLATION_SIZE];  /// V2_0::GnssConstellationType size is 8
+    memset(blackSvid, 0x00, sizeof(long long)*GNSS_CONSTELLATION_SIZE);
+
+    for (size_t i = 0; i < listSize; i++) {
+        int idx = (int) sourceList[i].constellation;
+        if (idx >= GNSS_CONSTELLATION_SIZE) {
+            ALOGE("%s: GnssConstellation type is out of boundary.", __func__);
+            continue;
+        } else if (sourceList[i].svid == 0) { /// all sv are blocked
+            blackSvid[idx] = (long long)(((long long)0xFFFFFFFFL << 32) | 0xFFFFFFFFL);
+        } else if (idx == GNSS_CONSTELLATION_QZSS) {
+            blackSvid[idx] |= (long long)((long long)0x01L << (sourceList[i].svid - 193)); /// QZSS is strated from 193
+        } else {
+            blackSvid[idx] |= (long long)((long long)0x01L << (sourceList[i].svid - 1));
+        }
+    }
+
+    mGnssConfigIface->set_black_list(blackSvid, GNSS_CONSTELLATION_SIZE);
+    return true;
 }
 
 // Methods from ::android::hardware::gnss::V2_0::IGnssConfiguration follow.
 Return<bool> GnssConfiguration::setEsExtensionSec(uint32_t emergencyExtensionSeconds) {
+    if (mGnssConfigIface == nullptr) {
+        ALOGE("%s: GNSS Configuration interface is not available.", __func__);
+        return false;
+    }
+
     ALOGD("setEsExtensionSec emergencyExtensionSeconds: %d", emergencyExtensionSeconds);
+    mGnssConfigIface->set_es_extension_sec(emergencyExtensionSeconds);
     return true;
 }
 
 }  // namespace implementation
-}  // namespace V2_0
+}  // namespace V2_1
 }  // namespace gnss
 }  // namespace hardware
 }  // namespace android

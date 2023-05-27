@@ -20,6 +20,7 @@
 #include <android/hardware/gnss/visibility_control/1.0/IGnssVisibilityControl.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
+#include "gps_mtk.h"
 
 namespace android {
 namespace hardware {
@@ -37,10 +38,22 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 
 struct GnssVisibilityControl : public IGnssVisibilityControl {
+    GnssVisibilityControl(const GnssVisibilityControlInterface* gnssVisibilityControlInterface);
+
     // Methods from ::android::hardware::gnss::visibility_control::V1_0::IGnssVisibilityControl
     // follow.
     Return<bool> enableNfwLocationAccess(const hidl_vec<hidl_string>& proxyApps) override;
     Return<bool> setCallback(const sp<V1_0::IGnssVisibilityControlCallback>& callback) override;
+
+    static void nfwNotifyCb(NfwNotification notification);
+
+    static bool isInEmergencySession();
+
+    static GnssVisibilityControlCallback_ext sGnssVisibilityControlCbs;
+
+private:
+    const GnssVisibilityControlInterface* mGnssVisibilityControlInterface = nullptr;
+    static sp<V1_0::IGnssVisibilityControlCallback> sIGnssVisibilityControlCbIface;
 };
 
 }  // namespace implementation

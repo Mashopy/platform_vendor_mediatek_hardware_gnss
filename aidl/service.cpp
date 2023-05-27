@@ -19,12 +19,26 @@
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <android/hardware/gnss/2.1/IGnss.h>
+#include <hidl/HidlSupport.h>
+#include <hidl/HidlTransportSupport.h>
+#include <hidl/LegacySupport.h>
+#include <hidl/Status.h>
 #include <log/log.h>
 #include <pthread.h>
 
 namespace aidl::android::hardware::gnss {
 extern int aidl_gnss_main();
 }
+
+
+using ::android::OK;
+using ::android::sp;
+using ::android::hardware::configureRpcThreadpool;
+using ::android::hardware::joinRpcThreadpool;
+using ::android::hardware::gnss::V2_1::IGnss;
+using ::android::hardware::registerPassthroughServiceImplementation;
+using ::android::status_t;
 
 int main() {
     //// Register AIDL service
@@ -33,6 +47,18 @@ int main() {
     ABinderProcess_startThreadPool();
     aidl::android::hardware::gnss::aidl_gnss_main();
 
+    ///// Register HIDL 2.1 service
+    ALOGE("Registering passthrough GNSS hal HIDL 2.1 service");
+    configureRpcThreadpool(1, true /* will join */);
+    status_t status_hidl;
+    status_hidl = registerPassthroughServiceImplementation<IGnss>();
+    if (status_hidl != OK) {
+        ALOGE("Error while registering GNSS hal HIDL implementation: %d", status_hidl);
+        return 1;
+    }
+
+    joinRpcThreadpool();
     ABinderProcess_joinThreadPool();
+
     return EXIT_FAILURE;  // should not reach
 }
